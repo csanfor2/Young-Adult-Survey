@@ -1,0 +1,1036 @@
+---
+title: "FACT SHEET OUTPUT"
+output: html_notebook
+---
+
+ ### Setup and Suppression Check
+
+```{r}
+county_name <- "Weston County"
+graph_name <- "Weston\nCounty"
+
+# Define the colors for county and statewide bar graphs
+bargraph_colors <- c(graph_name = "#D98B28", "Statewide" = "#306B80")
+
+#install.packages('plyr', repos = 'https://cloud.r-project.org')
+#install.packages('tidyverse')
+library(plyr)
+library(magrittr)
+library(dplyr)
+library(ggrepel)
+library(tidyr)
+library(waffle)
+
+
+#Looking at number of respondents per variable, filtering only the questions where there were <50 respondents
+summary_table_long <- county %>%
+  summarise(
+    housing_respondents = sum(!is.na(demo_9)), #living situation
+    Insured_respondents = sum(!is.na(ha)), #Health Insurance
+    mh1_respondents = sum(!is.na(mh_1)),#MH care in last year
+    food_respondents = sum(!is.na(demo_8)), #Food Insecurity
+    language_respondents = sum(!is.na(demo_3)), #Language other than English
+    demo_respondents = sum(!is.na(demo)), #sex at birth
+    white = sum(!is.na(demo_2___a)), #white
+    black = sum(!is.na(demo_2___b)), #black
+    asian = sum(!is.na(demo_2___c)), #asian
+    NHPI = sum(!is.na(demo_2___d)), #NHPI
+    AIAN = sum(!is.na(demo_2___e)), #AIAN
+    BIracial = sum(!is.na(demo_2___f)), #BIracial
+    Hispanic = sum(!is.na(demo_2___g)), #Hispaic
+    Other_race = sum(!is.na(demo_2___h)), #Other race
+    ed_respondents = sum(!is.na(demo_4)), #Education level
+    alcohol_respondents = sum(!is.na(a)), #Any alcohol
+    Cigarettes_respondents = sum(!is.na(t___a)), #Cigarettes
+    Cigars_respondents = sum(!is.na(t___b)), #Cigars
+    Vaping_respondents = sum(!is.na(t___e)), #Vaping
+    Othertob_respondents = sum(!is.na(t___f)), #Other tobacco
+    Hookah_respondents = sum(!is.na(t___c)), #Hookah
+    Smokeless_respondents = sum(!is.na(t___d)), #Smokeless
+    a1_respondents = sum(!is.na(a_1)), #Alcohol in last 30 days
+    a2_respondents = sum(!is.na(a_2)), #binge drinking in last 30 days
+    a7_respondents = sum(!is.na(a_7)), #Risk of binge drinking
+    marijuana_respondents = sum(!is.na(m)), #MJ in last year
+    m_7_respondents = sum(!is.na(m_7)), #Risk of marijuana usage
+    d1_respondents = sum(!is.na(d_1)),#Prescription drugs to get high
+    d2_respondents = sum(!is.na(d_2)),#Prescription drugs in last 30 days
+    d3_respondents = sum(!is.na(d_3)),#Prescription painkillers in last 30 days
+    mh_respondents = sum(!is.na(mh)), #depressed
+    mh3_respondents = sum(!is.na(mh_3)), #Considered suicide
+    mh4_respondents = sum(!is.na(mh_4)), #Attempted Suicide
+    mh2_respondents = sum(!is.na(mh_2)),#would you seek mental health care
+    fire_respondents = sum(!is.na(fire)),
+    fire1_respondents = sum(!is.na(fire_1)),
+    fire2_respondents = sum(!is.na(fire_2))
+) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "respondents"
+  ) %>%
+ filter(respondents < 50)
+
+# View the reshaped table
+print(summary_table_long)
+
+
+
+
+```
+
+### Outputting County Graphic Stats
+
+```{r}
+
+
+demo9_weighted_prop <- plot_demo9 %>%
+  filter(varname == "Steady place to live") %>%
+  filter(group == "County")  %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_demo9<- round(demo9_weighted_prop)
+  
+hayn_weighted_prop <- plot_hayn %>%
+  filter(varname == "Yes") %>%
+  filter(group == "County")  %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_hayn<- round(hayn_weighted_prop)
+
+plot_mh1$Weighted_Prop <- plot_mh1$Weighted_Prop*100
+mh1_weighted_prop <- plot_mh1 %>%
+  filter(varname == "Yes") %>%
+  filter(group == "County")  %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_mh1<- round(mh1_weighted_prop)
+
+demo8_weighted_prop <- plot_demo8 %>%
+  filter(varname == "Yes") %>%
+  filter(group == "County")  %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_demo8<- round(demo8_weighted_prop)
+  
+demo3_weighted_prop <- plot_demo3 %>%
+  filter(varname == "Yes") %>%
+  filter(group == "County")  %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_demo3<- round(demo3_weighted_prop)
+```
+
+### Demographic Profile
+
+```{r}
+# Dropping unnecessary columns from plot_demo and race_all
+plot_demo_graph <- plot_demo %>%
+  select(-Freq) %>%
+  filter(varname != "Intersex") %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100)
+
+# Recode race to "All other races and ethnicities"
+race_all_graph <- race_all %>%
+  select(-Freq, -varname) %>%
+  dplyr::rename(varname = race) %>%
+  arrange(group, desc(Weighted_Prop)) %>%
+  mutate(varname = case_when(
+    varname %in% c("Asian", "Bi-racial or Multi-racial", "NH/PI", "Other") ~ "All other races and ethnicities",
+    TRUE ~ varname
+  ))
+
+# Summing weighted proportions for 'All other races and ethnicities'
+sum_weighted_prop_state <- race_all_graph %>%
+  filter(group == "Statewide" & varname == "All other races and ethnicities") %>%
+  summarise(Weighted_Prop = sum(Weighted_Prop)) %>%
+  pull(Weighted_Prop)
+
+sum_weighted_prop_county <- race_all_graph %>%
+  filter(group == "County" & varname == "All other races and ethnicities") %>%
+  summarise(Weighted_Prop = sum(Weighted_Prop)) %>%
+  pull(Weighted_Prop)
+
+# Updating the 'All other races and ethnicities' rows with summed values
+race_all_graph <- race_all_graph %>%
+  mutate(Weighted_Prop = case_when(
+    group == "County" & varname == "All other races and ethnicities" ~ sum_weighted_prop_county,
+    group == "Statewide" & varname == "All other races and ethnicities" ~ sum_weighted_prop_state,
+    TRUE ~ Weighted_Prop
+  )) %>%
+  distinct()
+
+
+# Dropping unnecessary columns from plot_demo4 and preparing for combining
+demo4_graph <- plot_demo4 %>%
+  select(-Freq)
+
+
+# Combine the cleaned dataframes
+combined_df <- bind_rows(plot_demo_graph, demo4_graph, race_all_graph) %>%
+  mutate(Weighted_Prop = round(Weighted_Prop))
+
+# Pivot the dataframe to have County and Statewide as columns
+final_df <- combined_df %>%
+  pivot_wider(names_from = group, values_from = Weighted_Prop) %>%
+  select(varname, County, Statewide)
+
+# View the final output
+print(final_df)
+```
+
+### Overall Substance Usage Graph
+
+```{r}
+#Creating overall county substance use graph
+
+substance_all <- rbind(Tobacco_all, plot_a) %>%
+    filter(varname == "Yes", 
+           group == "County",
+           Tobacco != "None") %>%
+     arrange(desc(Weighted_Prop))
+
+# Create a named vector of colors corresponding to each unique Tobacco value
+colors_overall <- c("Alcohol" = "#306B80", "Cigarettes" = "#D98B28", "Cigars" = "#632709")
+
+P_overall <- ggplot(substance_all, aes(x = reorder(Tobacco, Weighted_Prop), y = Weighted_Prop * 100, fill = Tobacco)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_void() +
+  labs(subtitle = county_name,
+       x = "Substance", y = "Percent") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors_overall) +
+  theme(legend.position = "none",  # Remove legend
+        axis.text.y = element_text(hjust = 1, size = 14, color = "black"),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.subtitle = element_text(hjust = 0.5, color = "black"),
+        plot.margin = margin(0, 0, 0, 5)) +  # Add more margin at the bottom
+  geom_text(
+    aes(
+      label = paste0(round(Weighted_Prop * 100, 0), "%"),
+      hjust = ifelse(Weighted_Prop < 0.6, -0.2, 1.0),  # Adjust horizontal justification for short bar
+      color = ifelse(Weighted_Prop < 0.6, "black", "white")  # Change color conditionally
+    ),
+    position = position_dodge(width = 0.9),
+    vjust = 0.5,
+    size = 5.5
+  ) +
+  scale_color_identity()  # Use the conditional colors directly
+
+
+```
+
+### Alcohol Section
+
+
+```{r}
+#Binge Drinking
+
+plot_ab_graph <- plot_ab %>%
+  filter(varname == "Yes") %>%
+  mutate(Percentage = Weighted_Prop * 100,
+   #      group = ifelse(group == "County", graph_name, group)
+         )
+
+
+```
+
+```{r}
+## Combined alcohol graph
+plot_a_graph <- plot_a[, !(names(plot_a) %in% "Freq")]
+plot_a_graph <- plot_a_graph %>%
+  filter(varname == "Yes") %>%
+  mutate(Percentage = Weighted_Prop * 100)
+plot_a_graph$Tobacco <- "Any alcohol"
+
+plot_ab_graph2 <- plot_ab_graph[, !(names(plot_ab_graph) %in% "Freq")]
+plot_ab_graph2 <- plot_ab_graph2 %>%
+  filter(varname == "Yes") %>%
+  mutate(Percentage = Weighted_Prop * 100)
+plot_ab_graph2$Tobacco <- "Binge Drinking**"
+plot_ab_graph2 <- plot_ab_graph2[, !(names(plot_ab_graph2) %in% "a_binge")]
+
+a_combined <- rbind(plot_a_graph, plot_ab_graph2)
+
+a_combined$Tobacco <- factor(a_combined$Tobacco, levels = c("Any alcohol", "Binge Drinking**"))
+
+bargraph_colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+
+
+# Ensure 'group' is a factor and set levels in the correct order
+a_combined$group <- factor(a_combined$group, levels = c("County", "Statewide"))
+
+# Creating the graph
+pa_all <- ggplot(a_combined, aes(x = Percentage, y = reorder(Tobacco, -as.numeric(Tobacco)), fill = group)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme_void() +
+  labs(
+    x = "Percentage",
+    y = "Tobacco Use",
+    fill = "Group"
+  ) +
+  # Ensure that the legend is ordered the same as the bars
+  scale_fill_manual(name = NULL, values = bargraph_colors, breaks = c("County", "Statewide")) +
+  scale_x_continuous(labels = scales::percent_format(scale = 1)) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    axis.text.y = element_text(hjust = 1, size = 24, color = "black"),
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    legend.position = "right",
+    legend.text = element_text(size = 14)
+  ) +
+  guides(fill = guide_legend(reverse = TRUE)) +  # Reverse the legend order
+  geom_text(
+    aes(label = paste0(round(Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels with percent sign
+
+```
+
+```{r}
+# Percention of risk of weekly binge-drinking
+##Summarizing only no or minimal risk to weekly binge-drinking
+plot_a7_graph <- plot_a7 %>%
+  mutate(a_7 = as.numeric(as.character(a_7))) %>%
+  filter(a_7 %in% c(1, 2)) %>%
+  mutate(varname = reorder(varname, a_7))
+
+summarized_plot_a7 <- plot_a7_graph %>%
+  group_by(group) %>%
+  dplyr::summarise(Total_Weighted_Prop = sum(Weighted_Prop)) %>%
+  mutate(Percentage = Total_Weighted_Prop * 100)
+
+print(summarized_plot_a7)
+
+# Define the colors for county and statewide bars
+colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+# Create the bar chart
+pa7 <- ggplot(summarized_plot_a7, aes(x = group, y = Total_Weighted_Prop * 100, fill = group)) +
+  coord_flip()+
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_void() +
+  labs(x = NULL,  # Remove x-axis title
+       y = NULL,) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors) +  # Assign specific colors to county and statewide bars
+  theme(legend.position = "none",
+        plot.title = element_blank(),  # Remove main title
+        axis.text.y = element_text(hjust = 1, size = 24, color = "black"),
+        axis.text.x = element_blank()
+  ) +
+  geom_text(
+    aes(label = paste0(round(Total_Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels with percent sign
+
+```
+
+### Marijuana Section
+
+```{r}
+#Marijuana use in the last year (m)
+
+#### Creating a donut chart 
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "County"
+plot_m_filtered <- plot_m %>%
+  filter(group == "County")
+
+# Calculate the cumulative percentage for labels' positions
+plot_m_filtered <- plot_m_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+pm1 <- ggplot(plot_m_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+ #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+county_weighted_prop <- plot_m_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_m1p <- round(county_weighted_prop)
+
+
+
+```
+
+```{r}
+####Marijuana use in the last 30 days
+
+#### Creating a donut chart 
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "County"
+plot_m4yn_filtered <- plot_m4yn %>%
+  filter(group == "County")
+
+# Calculate the cumulative percentage for labels' positions
+plot_m4yn_filtered <- plot_m4yn_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+pm4yn <- ggplot(plot_m4yn_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+ #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+county_weighted_prop <- plot_m4yn_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_m4yn <- round(county_weighted_prop)
+```
+
+```{r}
+#Perceived risk of marijuana 
+##Summarizing only no or minimal risk to smoking marijuana
+plot_m7_graph <- plot_m7 %>%
+  mutate(m_7 = as.numeric(as.character(m_7))) %>%
+  filter(m_7 %in% c(1, 2)) %>%
+  mutate(varname = reorder(varname, m_7))
+
+summarized_plot_m7 <- plot_m7_graph %>%
+  group_by(group) %>%
+  dplyr::summarise(Total_Weighted_Prop = sum(Weighted_Prop)) %>%
+  mutate(Percentage = Total_Weighted_Prop * 100)
+
+print(summarized_plot_m7)
+
+# Define the colors for county and statewide bars
+colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+# Create the bar chart
+pm7 <- ggplot(summarized_plot_m7, aes(x = group, y = Total_Weighted_Prop * 100, fill = group)) +
+  coord_flip()+
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_void() +
+  labs(x = NULL,  # Remove x-axis title
+       y = NULL,) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors) +  # Assign specific colors to county and statewide bars
+  theme(legend.position = "none",
+        plot.title = element_blank(),  # Remove main title
+    axis.text.y = element_text(hjust = 1, size = 24, color = "black"),
+    axis.text.x = element_blank()
+  ) +
+  geom_text(
+    aes(label = paste0(round(Total_Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels with percent sign
+
+```
+
+### Opioids Section
+
+```{r}
+#Opioid Use Statistic
+
+# Filter the dataframe to include only rows where group is "County" and d_1 is 1
+plot_d1_filtered <- plot_d1 %>%
+  filter(group == "County")
+
+# Calculate the cumulative percentage for labels' positions
+plot_d1_filtered <- plot_d1_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+
+d1_weighted_prop <- plot_d1_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_d1<- round(d1_weighted_prop)
+```
+
+```{r}
+##Plot d2_yn - Prescription drugs in the last 30 days
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "County" and d_1 is 1
+plot_d2yn_filtered <- plot_d2yn %>%
+  filter(group == "County")
+
+# Calculate the cumulative percentage for labels' positions
+plot_d2yn_filtered <- plot_d2yn_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+pd2 <-ggplot(plot_d2yn_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+  #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+d2_weighted_prop <- plot_d2yn_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_d2<- round(d2_weighted_prop)
+```
+
+```{r}
+##Plot d3_yn - Prescription PAINKILLERS in the last 30 days
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "County" and d_1 is 1
+plot_d3yn_filtered <- plot_d3yn %>%
+  filter(group == "County")
+
+# Calculate the cumulative percentage for labels' positions
+plot_d3yn_filtered <- plot_d3yn_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+pd3yn <- ggplot(plot_d3yn_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+  #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+d3_weighted_prop <- plot_d3yn_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  whole_number_d3<- round(d3_weighted_prop)
+```
+
+### Mental Health
+
+```{r}
+## Summarizing feeling depressed everyday or more than half time
+plot_mh_a <- plot_mh %>%
+  mutate(mh = as.numeric(as.character(mh))) %>%
+  filter(mh %in% c(1, 2)) %>%
+  mutate(varname = reorder(varname, mh))
+
+plot_mh_a2 <- plot_mh_a %>%
+  group_by(group) %>%
+ dplyr:: summarise(Total_Weighted_Prop = sum(Weighted_Prop)) %>%
+  mutate(
+    Percentage = Total_Weighted_Prop * 100,
+   # group = ifelse(group == "County", graph_name, group)
+  )
+         
+# Define the colors for county and statewide bars
+colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+
+# Create the bar chart with text labels
+# Create the bar chart with text labels
+pmha <- ggplot(plot_mh_a2, aes(x = group, y = Total_Weighted_Prop * 100, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors) +  # Assign specific colors to county and statewide bars
+  theme(
+    legend.position = "none",
+    plot.title = element_blank(),  # Remove main title
+    axis.text.y = element_text(size = 24, color = "black"),
+    axis.text.x = element_blank(),
+    plot.margin = margin(1, 3, 1, 1, "cm")  # Increase left margin
+  ) +
+  geom_text(
+    aes(label = paste0(round(Total_Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels without percent sign
+```
+
+
+
+#### Suicide
+
+```{r}
+# Considered Suicide
+##### Bar Chart
+# Define the colors for county and statewide bars
+colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+
+plot_mh3_graph <- plot_mh3 %>%
+  filter(mh_3 %in% c(1)) %>%
+  mutate(Percentage = Weighted_Prop * 100)
+
+
+# Create the bar chart with text labels
+pmh3a <- ggplot(plot_mh3_graph, aes(x = group, y = Weighted_Prop * 100, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors) +  # Assign specific colors to county and statewide bars
+  theme(
+    legend.position = "none",
+    plot.title = element_blank(),  # Remove main title
+    axis.text.y = element_text(size = 24, color = "black"),
+    axis.text.x = element_blank(),
+    plot.margin = margin(1, 3, 1, 1, "cm")  # Increase left margin
+  ) +
+  geom_text(
+    aes(label = paste0(round(Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels with percent sign
+
+```
+
+```{r}
+#### Attempted Suicide
+
+##### Bar Chart
+# Define the colors for county and statewide bars
+colors <- c("County" = "#D98B28", "Statewide" = "#306B80")
+
+plot_mh4yn_graph <- plot_mh4yn %>%
+  filter(mh4yn %in% c(1)) %>%
+  mutate(Percentage = Weighted_Prop * 100,
+        # group = ifelse(group == "County", graph_name, group)
+         )
+
+
+# Create the bar chart with text labels
+pmh4a <- ggplot(plot_mh4yn_graph, aes(x = group, y = Weighted_Prop * 100, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors) +  # Assign specific colors to county and statewide bars
+  theme(
+    legend.position = "none",
+    plot.title = element_blank(),  # Remove main title
+    axis.text.y = element_text(size = 24, color = "black"),
+    axis.text.x = element_blank(),
+    plot.margin = margin(1, 3, 1, 1, "cm")  # Increase left margin
+  ) +
+  geom_text(
+    aes(label = paste0(round(Weighted_Prop * 100, 0), "%")),
+    position = position_dodge(width = 0.9),
+    hjust = 1.1,  # Adjust horizontal justification
+    vjust = 0.5,   # Adjust vertical justification
+    size = 9,
+    color = "white"
+  )  # Add text labels without percent sign
+
+```
+
+```{r}
+##Would see a mental health practitioner
+# Filter the data for group = "County" and calculate whole percentages
+plot_mh2_county <- plot_mh2 %>%
+  filter(group == "County") %>%
+  mutate(Weighted_whole = round(Weighted_Prop * 100))  # Calculate whole number percentages
+
+# Ensure the whole numbers add up to 100
+adjusted_data <- plot_mh2_county %>%
+  mutate(Weighted_whole = round(Weighted_Prop * 100)) %>%
+  mutate(diff = 100 - sum(Weighted_whole)) %>%   # Calculate the difference from 100
+  arrange(desc(Weighted_whole)) %>%              # Arrange in descending order
+  dplyr::mutate(Weighted_whole = ifelse(row_number() == 1, Weighted_whole + diff, Weighted_whole))  # Adjust the first value
+
+# Prepare the data for the waffle chart
+waffle_data <- adjusted_data %>%
+  mutate(varname = factor(varname, levels = c("Yes", "No", "Unsure"))) %>%
+  select(varname, Weighted_whole)
+
+# Create a named vector for the waffle chart
+waffle_data_vector <- setNames(waffle_data$Weighted_whole, waffle_data$varname)
+
+# Create the waffle chart
+waffle_chart <- waffle(
+  parts = waffle_data_vector,
+  rows = 10,
+  colors = c("#6192A8", "#632709", "gray"),  # Colors for Yes, No, Unsure
+  size = 1,
+  legend_pos = "bottom"
+) + 
+  theme(
+    legend.text = element_text(size = 14),  # Adjust legend text size
+    legend.title = element_blank(),  # Remove legend title
+    plot.title = element_blank()  # Ensure no main title
+  )
+
+# Display the waffle chart
+print(waffle_chart)
+
+# Extract the percentage for "Yes" responses for further use
+county_mhweighted_prop <- waffle_data %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_whole) %>%
+  pull()
+
+# Print the whole number value for "Yes"
+print(county_mhweighted_prop)
+
+
+```
+
+
+
+#### Crosstab graph
+```{r}
+
+# Define the custom colors
+colors <- c("Yes" = "#6192A8", "No" = "#A25525")
+
+# Reorder the substances in the specified order (Alcohol, Tobacco, Marijuana, Prescription Drugs)
+crosstabs.cty$substance <- factor(crosstabs.cty$substance, 
+                                  levels = c("Alcohol", "Tobacco", "Marijuana", "Prescription Drugs"))
+
+# Create the side-by-side bar chart with adjustments
+p_crosstab <- ggplot(crosstabs.cty, aes(x = substance, y = Percent, fill = yesno)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+  geom_text(aes(
+    label = paste0(round(Percent, 0), "%"),
+    color = ifelse(Percent >= 105, "white", "black"),
+    group = yesno
+  ),
+  position = position_dodge(width = 0.9), vjust = 0.5, 
+  hjust = ifelse(crosstabs.cty$Percent >= 105, 1.2, -0.3), size = 7) +  # Increase label size here
+  scale_fill_manual(values = colors) +  # Apply the custom colors
+  scale_color_identity() +  # Use the colors specified in aes() without a legend
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),  # Remove x-axis title
+    axis.title.y = element_blank(),  # Remove y-axis title
+    axis.text.y = element_text(size = 20, color = "black"),  # Increase size of substance labels
+    axis.text.x = element_blank(),  # Remove bar numbers across the bottom
+    panel.grid = element_blank(),  # Remove background grid lines
+    legend.position = "none"  # Remove the legend
+  ) +
+  scale_x_discrete(limits = rev(levels(crosstabs.cty$substance))) +  # Ensure correct order after flip
+  coord_flip()  # Flip the axes
+
+setwd("/Users/codyloveland/Desktop/Loveland Solutions/Proposals/Awarded Proposals/YAS Proposal Feb 2024")
+ggsave("crosstab_plot.png", plot = p_crosstab, width = 20, height = 14, dpi = 300)
+
+```
+
+#### Firearms
+
+```{r}
+##Plot fire - firearms kept at home
+# Filter the dataframe.   
+
+#Limiting it to answer=yes
+plot_fire_filtered <- plot_fire %>%
+  filter(group == "County" & fire %in% c(1))
+
+# Print Weighted_Prop as percentage with no decimal places
+fire_weighted_prop <- plot_fire_filtered %>%
+  filter(varname == "Yes") %>%
+  mutate(Weighted_Prop_Percentage = round(Weighted_Prop * 100, 0)) %>%
+  select(Weighted_Prop_Percentage) %>%
+  pull()
+
+
+
+```
+
+```{r}
+##Plot fire - firearms kept at home
+# Filter the dataframe.   2=unloaded
+##Plot fire1 - LOADED firearms kept at home
+
+# Filter the dataframe to include only rows where group is "County" and fire_1 is 2. Question asks are any of these firearms now loaded. 1=yes, 2=no. No get unloaded, filtering answer=2.
+plot_fire_filtered1 <- plot_fire1 %>%
+  filter(group == "County" & fire_1 %in% c(2)) %>%
+  mutate(
+    Remaining_Prop = 100 - Weighted_Prop,
+    Weighted_Prop = Weighted_Prop * 100,  # Convert to percentage
+    Remaining_Prop = Remaining_Prop * 100  # Convert to percentage
+  )
+
+plot_fire_long <- plot_fire_filtered1 %>%
+  select(varname, group, Weighted_Prop, Remaining_Prop) %>%
+  gather(key = "Type", value = "Value", Weighted_Prop, Remaining_Prop)
+
+# Create the stacked bar chart
+p_fire1 <- ggplot(plot_fire_long, aes(x = varname, y = Value, fill = Type)) +
+  geom_bar(stat = "identity", color="white") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL,
+    title = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), limits = c(0, 100)) +
+  scale_fill_manual(values = c("Weighted_Prop" = "#6192A8", "Remaining_Prop" = "gray")) +  # Assign specific colors
+  theme(
+    legend.position = "none",  # Remove legend
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)  # Center and size title
+  ) +
+  geom_text(
+    aes(y = Value, label = ifelse(Type == "Weighted_Prop", paste0(round(Value, 0), "%"), "")),
+    position = position_stack(vjust = 0.5),
+    size = 15,
+    color = "white"
+  )  # Add text labels with percent sign
+```
+
+```{r}
+##Plot fire2 - LOADED and UNLOCKED firearms kept at home
+
+plot_fire_filtered2 <- plot_fire2 %>%
+  filter(group == "County" & fire_2 %in% c(1)) %>%
+  mutate(
+    Remaining_Prop = 100 - Weighted_Prop,
+    Weighted_Prop = Weighted_Prop * 100,  # Convert to percentage
+    Remaining_Prop = Remaining_Prop * 100  # Convert to percentage
+  )
+
+plot_fire_long2 <- plot_fire_filtered2 %>%
+  select(varname, group, Weighted_Prop, Remaining_Prop) %>%
+  gather(key = "Type", value = "Value", Weighted_Prop, Remaining_Prop)
+
+# Create the stacked bar chart
+p_fire2 <- ggplot(plot_fire_long2, aes(x = varname, y = Value, fill = Type)) +
+  geom_bar(stat = "identity", color="white") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL,
+    title = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), limits = c(0, 100)) +
+  scale_fill_manual(values = c("Weighted_Prop" = "#A25525", "Remaining_Prop" = "gray")) +  # Assign specific colors
+  theme(
+    legend.position = "none",  # Remove legend
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)  # Center and size title
+  ) +
+  geom_text(
+    aes(y = ifelse(Type == "Weighted_Prop", Value, NA), label = paste0(round(Value, 0), "%")),
+    position = position_stack(vjust = 0.5),
+    size = 15,
+    color = "white"
+  )  # Add text labels with percent sign
+
+
+
+
+
+```
+
+#### Alternate Suppressed Graphs
+
+```{r}
+## STATEWIDE Plot d2_yn - Prescription drugs in the last 30 days
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "Statewide" and d_1 is 1
+plot_d2yn_filtered <- plot_d2yn %>%
+  filter(group == "Statewide")
+
+# Calculate the cumulative percentage for labels' positions
+plot_d2yn_filtered <- plot_d2yn_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+alt_pd2 <-ggplot(plot_d2yn_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+  #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+d2_weighted_prop <- plot_d2yn_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  alt_whole_number_d2<- round(d2_weighted_prop)
+```
+
+```{r}
+##STATEWIDE Plot d3_yn - Prescription PAINKILLERS in the last 30 days
+colors <- c("Yes" = "#632709", "No" = "gray")
+
+# Filter the dataframe to include only rows where group is "County" and d_1 is 1
+plot_d3yn_filtered <- plot_d3yn %>%
+  filter(group == "Statewide")
+
+# Calculate the cumulative percentage for labels' positions
+plot_d3yn_filtered <- plot_d3yn_filtered %>%
+  mutate(Weighted_Prop = Weighted_Prop * 100,
+         cumulative = cumsum(Weighted_Prop),
+         midpoint = cumulative - Weighted_Prop / 2)
+
+# Create the donut chart
+alt_pd3yn <- ggplot(plot_d3yn_filtered, aes(x = 2, y = Weighted_Prop, fill = varname)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  theme_void() +  # Remove background, grid, and axis
+  xlim(0.5, 2.5) +  # Adjust x limits to create the hole in the middle
+  #geom_text(aes(y = midpoint, label = paste0(round(Weighted_Prop, 1), "%")), color = "white") +  # Add labels
+  scale_fill_manual(values = colors) +  # Assign specific colors
+  theme(legend.position = "none",
+        plot.title = element_blank())  # Remove main title
+
+d3_weighted_prop <- plot_d3yn_filtered %>%
+  filter(varname == "Yes") %>%
+  select(Weighted_Prop) %>%
+  pull()
+  alt_whole_number_d3<- round(d3_weighted_prop)
+```
+
+
+```{r}
+##Plot fire - LOADED firearms kept at home
+
+# Filter the dataframe to include only rows where group is "County" and fire_1 is 2. Question asks are any of these firearms now loaded. 1=yes, 2=no. No get unloaded, filtering answer=2.
+alt_plot_fire_filtered1 <- plot_fire1 %>%
+  filter(group == "Statewide" & fire_1 %in% c(2)) %>%
+  mutate(
+    Remaining_Prop = 1 - Weighted_Prop,
+    Weighted_Prop = Weighted_Prop * 100,  # Convert to percentage
+    Remaining_Prop = Remaining_Prop * 100  # Convert to percentage
+  )
+
+alt_plot_fire_long <- alt_plot_fire_filtered1 %>%
+  select(varname, group, Weighted_Prop, Remaining_Prop) %>%
+  gather(key = "Type", value = "Value", Weighted_Prop, Remaining_Prop)
+
+# Create the stacked bar chart
+alt_p_fire1 <- ggplot(alt_plot_fire_long, aes(x = varname, y = Value, fill = Type)) +
+  geom_bar(stat = "identity", color="white") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL,
+    title = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), limits = c(0, 100)) +
+  scale_fill_manual(values = c("Weighted_Prop" = "#6192A8", "Remaining_Prop" = "gray")) +  # Assign specific colors
+  theme(
+    legend.position = "none",  # Remove legend
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16),  # Center and size title
+    panel.background = element_blank(),  # Remove panel background
+    plot.background = element_blank()  # Remove overall plot background
+  ) +
+  geom_text(
+    aes(y = ifelse(Type == "Weighted_Prop", Value, NA), label = paste0(round(Value, 0), "%")),
+    position = position_stack(vjust = 0.5),
+    size = 15,
+    color = "white"
+  )  # Add text labels with percent sign
+```
+
+
+
+```{r}
+##Plot fire2 - LOADED but LOCKED firearms kept at home. - filtered for statewide instead of County
+
+alt_plot_fire_filtered2 <- plot_fire2 %>%
+  filter(group == "Statewide" & fire_2 %in% c(1)) %>%
+  mutate(
+    Remaining_Prop = 100 - Weighted_Prop,
+    Weighted_Prop = Weighted_Prop * 100,  # Convert to percentage
+    Remaining_Prop = Remaining_Prop * 100  # Convert to percentage
+  )
+
+alt_plot_fire_long2 <- alt_plot_fire_filtered2 %>%
+  select(varname, group, Weighted_Prop, Remaining_Prop) %>%
+  gather(key = "Type", value = "Value", Weighted_Prop, Remaining_Prop)
+
+# Create the stacked bar chart
+alt_p_fire2 <- ggplot(alt_plot_fire_long2, aes(x = varname, y = Value, fill = Type)) +
+  geom_bar(stat = "identity", color="white") +
+  coord_flip() +
+  theme_void() +
+  labs(
+    x = NULL,  # Remove x-axis title
+    y = NULL,
+    title = NULL
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), limits = c(0, 100)) +
+  scale_fill_manual(values = c("Weighted_Prop" = "#A25525", "Remaining_Prop" = "gray")) +  # Assign specific colors
+  theme(
+    legend.position = "none",  # Remove legend
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)  # Center and size title
+  ) +
+  geom_text(
+    aes(y = ifelse(Type == "Weighted_Prop", Value, NA), label = paste0(round(Value, 0), "%")),
+    position = position_stack(vjust = 0.5),
+    size = 15,
+    color = "white"
+  )  # Add text labels with percent sign
+
+
+```
+
